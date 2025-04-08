@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flowing Halftone SVG Generator</title>
+  <style>
+    /* CSS remains largely the same as the previous version */
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 { color: #333; text-align: center; margin-bottom: 30px; }
+    .controls { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .image-preview { margin: 20px 0; border: 1px solid #ddd; max-width: 100%; background: #fff; padding: 10px; box-sizing: border-box; min-height: 100px; text-align: center; }
+    img#previewImage { max-width: 100%; max-height: 300px; height: auto; display: block; margin: 0 auto; }
+    .svg-preview-area { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
+    .svg-preview { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px; }
+    .svg-container { background: white; padding: 15px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex: 1 1 250px; min-width: 250px; box-sizing: border-box; text-align: center; border: 1px solid #eee; }
+    .svg-container h3 { margin-top: 0; font-size: 1em; color: #444; }
+    .svg-container svg { max-width: 100%; height: auto; border: 1px solid #eee; background: repeating-conic-gradient(#f0f0f0 0% 25%, transparent 0% 50%) 50% / 10px 10px; }
+    .download-links { margin-top: 20px; padding: 15px; background: #e9e9e9; border-radius: 4px; text-align: center; }
+    .download-links a { display: inline-block; margin: 5px; padding: 8px 15px; background: #555; color: white; text-decoration: none; border-radius: 4px; }
+    .download-links a:hover { background: #333; }
+    button, select, input[type="text"], input[type="number"], input[type="file"], input[type="color"] { padding: 8px 12px; margin: 5px 0; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; vertical-align: middle; }
+    input[type="color"] { padding: 2px; height: 38px; width: 50px; border: 1px solid #ccc; vertical-align: middle; }
+    input[type="checkbox"] { margin-right: 5px; vertical-align: middle; }
+    input[type="range"] { vertical-align: middle; }
+    input:disabled, button:disabled { background: #eee; cursor: not-allowed; color: #999 }
+    button { background: #0066ff; color: white; border: none; cursor: pointer; padding: 10px 15px; }
+    label { margin-top: 10px; margin-bottom: 3px; margin-right: 5px; font-weight: bold; font-size: 0.9em; vertical-align: middle; }
+    .controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 15px; }
+    .control-group { background: #f9f9f9; padding: 15px; border-radius: 5px; border: 1px solid #eee; }
+    .control-group label { display: block; margin-top: 8px; }
+    .control-group label:first-child { margin-top: 0; }
+    .control-group .control-row { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 10px; margin-bottom: 10px; }
+    .control-group .control-row label { margin-bottom: 0; margin-top: 0; flex-shrink: 0; }
+    .control-group .control-row label[for="useStroke"],
+    .control-group .control-row label[for="useGradientDistortion"] { display: flex; align-items: center; } /* Better alignment for checkbox labels */
+    .value-display { font-weight: normal; font-size: 0.9em; color: #555; margin-left: 5px; }
+    .status-message { font-style: italic; color: #666; margin: 10px 0; font-size: 0.9em;}
+  </style>
+</head>
+<body>
+  <h1>Flowing Halftone SVG Generator</h1>
+
+  <div class="controls">
+    <div class="control-row">
+        <label for="imageInput">Upload Image:</label>
+        <input type="file" id="imageInput" accept="image/*">
+        <span id="imageStatus" class="status-message"></span>
+    </div>
+
+    <div class="controls-grid">
+        <div class="control-group">
+             <label for="outputWidthMM">Output Width (mm):</label>
+             <input type="number" id="outputWidthMM" value="210" min="10">
+             <label for="gridSpacing">Grid Spacing:</label>
+             <div> <input type="range" id="gridSpacing" min="2" max="50" value="10" step="1"> <span class="value-display">(<span id="gridSpacingValue">10</span> px)</span> </div>
+             <label for="maxCircleSize">Max Circle Diameter:</label>
+              <div> <input type="range" id="maxCircleSize" min="1" max="50" value="9" step="0.5"> <span class="value-display">(<span id="maxCircleSizeValue">9</span> px)</span> </div>
+             <label for="minCircleSize">Min Circle Diameter:</label>
+             <div> <input type="range" id="minCircleSize" min="0.1" max="10" value="0.5" step="0.1"> <span class="value-display">(<span id="minCircleSizeValue">0.5</span> px)</span> </div>
+        </div>
+
+        <div class="control-group">
+             <label for="offsetX">Offset Grid X (px):</label>
+            <div> <input type="range" id="offsetX" min="-30" max="30" value="5" step="1"> <span class="value-display">(<span id="offsetXValue">5</span> px)</span> </div>
+            <label for="offsetY">Offset Grid Y (px):</label>
+             <div> <input type="range" id="offsetY" min="-30" max="30" value="5" step="1"> <span class="value-display">(<span id="offsetYValue">5</span> px)</span> </div>
+             <hr style="margin: 15px 0; border: none; border-top: 1px solid #eee;">
+             <div class="control-row">
+                 <label for="useGradientDistortion">
+                     <input type="checkbox" id="useGradientDistortion" disabled> Use Image-Based Flow
+                 </label>
+             </div>
+             <label for="distortionAmount">Distortion Amount:</label>
+             <div> <input type="range" id="distortionAmount" min="0" max="50" value="10" step="1"> <span class="value-display">(<span id="distortionAmountValue">10</span> px)</span> </div>
+             <label for="distortionScale">Wave Scale:</label>
+             <div> <input type="range" id="distortionScale" min="0.001" max="0.1" value="0.015" step="0.001"> <span class="value-display">(<span id="distortionScaleValue">0.015</span>)</span> </div>
+             <span class="status-message">(Wave Scale only used if Image-Based Flow is off)</span>
+        </div>
+
+        <div class="control-group">
+            <div class="control-row">
+                 <label for="mainColor1">Main Color 1:</label> <input type="color" id="mainColor1" value="#FFFF00">
+                 <label for="mainColor2" style="margin-left: 15px;">Main Color 2:</label> <input type="color" id="mainColor2" value="#0000FF">
+            </div>
+            <div class="control-row">
+                 <label for="offsetColor">Offset Color:</label> <input type="color" id="offsetColor" value="#800080">
+            </div>
+            <hr style="margin: 15px 0; border: none; border-top: 1px solid #eee;">
+            <div class="control-row">
+                <label for="useStroke"> <input type="checkbox" id="useStroke"> Use Outlines (Strokes) </label>
+            </div>
+             <div class="control-row">
+                <label for="strokeWidth">Stroke Width (px):</label>
+                <input type="number" id="strokeWidth" value="0.5" step="0.1" min="0.1" disabled>
+            </div>
+        </div>
+    </div>
+
+     <div class="image-preview" id="imagePreview">
+        <p>Upload an image to begin.</p>
+        <img id="previewImage" src="#" alt="Image Preview" style="display: none;">
+    </div>
+
+    <div style="text-align: center; margin-top: 20px;">
+        <button id="generateButton" disabled>Generate SVGs</button>
+    </div>
+  </div> <div class="svg-preview-area">
+         <h2>SVG Previews</h2>
+         <div class="svg-preview" id="svgPreview"> <p>Previews will appear here after generation.</p> </div>
+         <div class="download-links" id="downloadLinks"> </div>
+    </div>
+
+  <script>
+    // --- Configuration ---
+    const config = { /* Default values */ }; // Populated in initialize()
+
+    // --- Constants ---
+    const MM_PER_PIXEL = 25.4 / 96; // Assuming standard 96 DPI
+
+    // --- DOM elements --- (Get all elements)
+    const imageInput = document.getElementById('imageInput');
+    const imageStatus = document.getElementById('imageStatus'); // Status message element
+    const imagePreviewDiv = document.getElementById('imagePreview');
+    const previewImage = document.getElementById('previewImage');
+    const generateButton = document.getElementById('generateButton');
+    const svgPreview = document.getElementById('svgPreview');
+    const downloadLinks = document.getElementById('downloadLinks');
+    // ... (get all input/slider/value elements similarly) ...
+     const outputWidthMMInput = document.getElementById('outputWidthMM');
+     // ... Grid/Circle sliders ...
+     const gridSpacingInput = document.getElementById('gridSpacing');
+     const gridSpacingValue = document.getElementById('gridSpacingValue');
+     const maxCircleSizeInput = document.getElementById('maxCircleSize');
+     const maxCircleSizeValue = document.getElementById('maxCircleSizeValue');
+     const minCircleSizeInput = document.getElementById('minCircleSize');
+     const minCircleSizeValue = document.getElementById('minCircleSizeValue');
+      // ... Offset sliders ...
+     const offsetXInput = document.getElementById('offsetX');
+     const offsetXValue = document.getElementById('offsetXValue');
+     const offsetYInput = document.getElementById('offsetY');
+     const offsetYValue = document.getElementById('offsetYValue');
+     // ... Distortion controls ...
+     const useGradientDistortionInput = document.getElementById('useGradientDistortion');
+     const distortionAmountInput = document.getElementById('distortionAmount');
+     const distortionAmountValue = document.getElementById('distortionAmountValue');
+     const distortionScaleInput = document.getElementById('distortionScale'); // Wave scale
+     const distortionScaleValue = document.getElementById('distortionScaleValue');
+     // ... Color/Stroke controls ...
+     const mainColor1Input = document.getElementById('mainColor1');
+     const mainColor2Input = document.getElementById('mainColor2');
+     const offsetColorInput = document.getElementById('offsetColor');
+     const useStrokeInput = document.getElementById('useStroke');
+     const strokeWidthInput = document.getElementById('strokeWidth');
+
+
+    // --- Global State ---
+    let currentImage = null;
+    let imagePixelData = null; // Grayscale pixel data
+    let currentGradientData = null; // { field: [], maxMagnitude: 0 }
+    let imageWidth = 0;
+    let imageHeight = 0;
+
+    // --- Helper Functions ---
+    function updateRangeDisplay(input, display) {
+      display.textContent = input.value;
+      config[input.id] = parseFloat(input.value);
+    }
+
+    function getBrightness(imageData, x, y, width) {
+      x = Math.max(0, Math.min(Math.floor(x), width - 1));
+      y = Math.max(0, Math.min(Math.floor(y), imageData.height - 1));
+      const i = (y * width + x) * 4;
+      if (i >= 0 && i < imageData.data.length - 3) return imageData.data[i];
+      return 255; // Default white
+    }
+
+     // Gradient calculation (simple central difference)
+     function calculateGradientField(imageData, width, height) {
+         console.time("Gradient Calculation");
+         const data = imageData.data;
+         const gradientField = new Array(width * height);
+         let maxMagnitude = 0;
+
+         for (let y = 0; y < height; y++) {
+             for (let x = 0; x < width; x++) {
+                 const idx = (y * width + x);
+                 // Get brightness of neighbours (using getBrightness handles boundaries)
+                 const bL = getBrightness(imageData, x - 1, y, width); // Left
+                 const bR = getBrightness(imageData, x + 1, y, width); // Right
+                 const bT = getBrightness(imageData, x, y - 1, width); // Top
+                 const bB = getBrightness(imageData, x, y + 1, width); // Bottom
+
+                 const gx = (bR - bL) / 2; // Horizontal gradient
+                 const gy = (bB - bT) / 2; // Vertical gradient
+                 const mag = Math.sqrt(gx * gx + gy * gy);
+
+                 gradientField[idx] = { gx, gy, mag };
+                 if (mag > maxMagnitude) {
+                     maxMagnitude = mag;
+                 }
+             }
+         }
+         console.timeEnd("Gradient Calculation");
+         console.log("Max gradient magnitude:", maxMagnitude);
+         return { field: gradientField, maxMagnitude: maxMagnitude > 0 ? maxMagnitude : 1 }; // Avoid division by zero
+     }
+
+
+    function mapRange(value, fromLow, fromHigh, toLow, toHigh) {
+      const clampedValue = Math.max(fromLow, Math.min(value, fromHigh));
+      const result = toLow + (toHigh - toLow) * ((clampedValue - fromLow) / (fromHigh - fromLow));
+      return isNaN(result) ? toLow : result;
+    }
+
+    function distortPointWave(x, y, width, height, amount, scale) {
+        const xWave = Math.sin(y * scale) * amount;
+        const yWave = Math.cos(x * scale) * amount;
+        const variationX = Math.sin(x * y * 0.0001) * (amount * 0.1);
+        const variationY = Math.cos(x * y * 0.00015) * (amount * 0.1);
+        return { x: x + xWave + variationX, y: y + yWave + variationY };
+    }
+
+     function distortPointGradient(x, y, width, height, amount, gradientData) {
+         if (!gradientData || !gradientData.field) { return {x, y}; } // Safety check
+
+         const idx = Math.floor(y) * width + Math.floor(x);
+         const grad = gradientData.field[idx];
+
+         if (grad && grad.mag > 0.1) { // Only displace if gradient is significant
+             // Perpendicular direction (-gy, gx)
+             let dx = -grad.gy;
+             let dy = grad.gx;
+
+             // Normalize direction vector
+             const len = Math.sqrt(dx * dx + dy * dy);
+             if (len > 0) {
+                 dx /= len;
+                 dy /= len;
+             }
+
+             // Scale displacement: Use gradient magnitude relative to max, scaled by amount
+             // Consider a non-linear mapping? (e.g., sqrt) - simple linear for now
+             const displacementMagnitude = mapRange(grad.mag, 0, gradientData.maxMagnitude, 0, amount);
+
+             return {
+                 x: x + dx * displacementMagnitude,
+                 y: y + dy * displacementMagnitude
+             };
+         }
+         return { x: x, y: y }; // No significant gradient, no displacement
+     }
+
+    // Wrapper function to choose distortion method
+    function distortPoint(x, y, width, height) {
+        if (config.useGradientDistortion && currentGradientData) {
+            return distortPointGradient(x, y, width, height, config.distortionAmount, currentGradientData);
+        } else {
+            // Ensure distortionScale is read from config if wave is used
+             config.distortionScale = parseFloat(distortionScaleInput.value) || 0.015;
+            return distortPointWave(x, y, width, height, config.distortionAmount, config.distortionScale);
+        }
+    }
+
+
+    function createSVGHeader(pixelWidth, pixelHeight, mmWidth, mmHeight) {
+        const w = mmWidth.toFixed(2);
+        const h = mmHeight.toFixed(2);
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${pixelWidth} ${pixelHeight}" width="${w}mm" height="${h}mm" shape-rendering="geometricPrecision">`;
+    }
+
+    function createSVGGroup(color, useStroke, strokeWidth) {
+        if (useStroke) return `<g fill="none" stroke="${color}" stroke-width="${strokeWidth}">`;
+        else return `<g fill="${color}" stroke="none">`;
+    }
+
+     function createCircleSVG(cx, cy, r) {
+        if (r && r > 0.05) return `<circle cx="${cx.toFixed(3)}" cy="${cy.toFixed(3)}" r="${r.toFixed(3)}" />`;
+        return "";
+     }
+
+    // --- Event Listeners ---
+    // ... (Range slider listeners remain the same) ...
+    gridSpacingInput.addEventListener('input', () => updateRangeDisplay(gridSpacingInput, gridSpacingValue));
+    maxCircleSizeInput.addEventListener('input', () => updateRangeDisplay(maxCircleSizeInput, maxCircleSizeValue));
+    minCircleSizeInput.addEventListener('input', () => updateRangeDisplay(minCircleSizeInput, minCircleSizeValue));
+    offsetXInput.addEventListener('input', () => updateRangeDisplay(offsetXInput, offsetXValue));
+    offsetYInput.addEventListener('input', () => updateRangeDisplay(offsetYInput, offsetYValue));
+    distortionAmountInput.addEventListener('input', () => updateRangeDisplay(distortionAmountInput, distortionAmountValue));
+    distortionScaleInput.addEventListener('input', () => updateRangeDisplay(distortionScaleInput, distortionScaleValue)); // Update wave scale config
+
+
+    // Specific input handlers
+    outputWidthMMInput.addEventListener('input', () => { config.outputWidthMM = parseFloat(outputWidthMMInput.value) || 210; });
+    mainColor1Input.addEventListener('input', () => { config.mainColor1 = mainColor1Input.value; });
+    mainColor2Input.addEventListener('input', () => { config.mainColor2 = mainColor2Input.value; });
+    offsetColorInput.addEventListener('input', () => { config.offsetColor = offsetColorInput.value; });
+    strokeWidthInput.addEventListener('input', () => { config.strokeWidth = parseFloat(strokeWidthInput.value) || 0.5; });
+    useStrokeInput.addEventListener('change', () => {
+        config.useStroke = useStrokeInput.checked;
+        strokeWidthInput.disabled = !config.useStroke;
+    });
+    useGradientDistortionInput.addEventListener('change', () => {
+        config.useGradientDistortion = useGradientDistortionInput.checked;
+        distortionScaleInput.disabled = config.useGradientDistortion; // Disable wave scale if using gradient
+    });
+
+
+    imageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      currentImage = null; // Reset state
+      imagePixelData = null;
+      currentGradientData = null;
+      generateButton.disabled = true;
+      useGradientDistortionInput.checked = false; // Reset distortion type
+      useGradientDistortionInput.disabled = true;
+      config.useGradientDistortion = false;
+      imageStatus.textContent = "";
+      previewImage.style.display = 'none';
+      imagePreviewDiv.querySelector('p').style.display = 'block';
+
+
+      if (file) {
+        imageStatus.textContent = "Loading image...";
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const img = new Image();
+          img.onload = function() {
+            imageStatus.textContent = "Processing image...";
+            currentImage = img;
+            imageWidth = img.width;
+            imageHeight = img.height;
+            previewImage.src = event.target.result;
+            previewImage.style.display = 'block';
+            imagePreviewDiv.querySelector('p').style.display = 'none';
+
+            // Use setTimeout to allow UI update before canvas operations
+            setTimeout(() => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                canvas.width = imageWidth;
+                canvas.height = imageHeight;
+                ctx.filter = 'grayscale(100%)';
+                ctx.drawImage(img, 0, 0, imageWidth, imageHeight);
+                try {
+                    imagePixelData = ctx.getImageData(0, 0, imageWidth, imageHeight);
+                    imageStatus.textContent = "Calculating flow field..."; // Update status
+
+                    // Calculate gradient field (can take a moment)
+                     setTimeout(() => {
+                         try {
+                             currentGradientData = calculateGradientField(imagePixelData, imageWidth, imageHeight);
+                             generateButton.disabled = false;
+                             useGradientDistortionInput.disabled = false; // Enable distortion choice
+                             imageStatus.textContent = "Image ready.";
+                             console.log("Image and gradient data ready.");
+                         } catch (gradientError) {
+                             console.error("Error calculating gradient field:", gradientError);
+                             alert("Could not calculate image flow field. Using wave distortion only.");
+                             imageStatus.textContent = "Image loaded (gradient failed).";
+                              generateButton.disabled = false; // Allow generation with wave distortion
+                              useGradientDistortionInput.disabled = true;
+                         }
+                     }, 10); // Allow status update before calculation
+
+                } catch (error) {
+                    console.error("Error getting image data:", error);
+                    alert("Could not process image. Check console.");
+                    imageStatus.textContent = "Image processing failed.";
+                }
+            }, 10); // Delay before canvas processing
+          };
+          img.onerror = () => { alert("Failed to load image."); imageStatus.textContent = "Failed to load image.";}
+          img.src = event.target.result;
+        };
+         reader.onerror = () => { alert("Failed to read file."); imageStatus.textContent = "Failed to read file.";}
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // --- Main Generation Logic ---
+    generateButton.addEventListener('click', () => {
+      if (!currentImage || !imagePixelData) { alert("Please upload image."); return; }
+      if (config.useGradientDistortion && !currentGradientData) {
+          alert("Gradient data is not ready, cannot use Image-Based Flow. Please wait or uncheck the option.");
+          return;
+      }
+
+
+      // Update config from inputs
+      config.outputWidthMM = parseFloat(outputWidthMMInput.value) || 210;
+      config.strokeWidth = parseFloat(strokeWidthInput.value) || 0.5;
+      config.mainColor1 = mainColor1Input.value;
+      config.mainColor2 = mainColor2Input.value;
+      config.offsetColor = offsetColorInput.value;
+      config.useStroke = useStrokeInput.checked;
+      config.useGradientDistortion = useGradientDistortionInput.checked;
+      // Read wave scale only if not using gradient
+      if (!config.useGradientDistortion) {
+          config.distortionScale = parseFloat(distortionScaleInput.value) || 0.015;
+      }
+
+
+      generateButton.textContent = "Generating...";
+      generateButton.disabled = true;
+      svgPreview.innerHTML = '<p>Generating SVG layers...</p>';
+      downloadLinks.innerHTML = '';
+
+      setTimeout(() => { // Allow UI update
+          try {
+            const results = generateSVGs();
+            displayResults(results);
+          } catch (error) {
+              console.error("Error during SVG generation:", error);
+              alert("An error occurred during SVG generation. Check console.");
+              svgPreview.innerHTML = '<p>Error generating SVGs.</p>';
+          } finally {
+            generateButton.textContent = "Generate SVGs";
+            // Re-enable based on state
+            generateButton.disabled = !(currentImage && imagePixelData && (!config.useGradientDistortion || currentGradientData));
+          }
+      }, 10);
+    });
+
+
+    function generateSVGs() {
+      if (!imagePixelData) throw new Error("Image pixel data missing.");
+      if (config.useGradientDistortion && !currentGradientData) throw new Error("Gradient data missing for gradient distortion.");
+
+
+      console.log("Starting SVG generation with config:", config);
+      console.log("Using distortion:", config.useGradientDistortion ? "Gradient-Based Flow" : "Wave");
+
+      const aspect = imageWidth / imageHeight;
+      const outputWidthMM = config.outputWidthMM;
+      const outputHeightMM = outputWidthMM / aspect;
+
+      const group1Def = createSVGGroup(config.mainColor1, config.useStroke, config.strokeWidth);
+      const group2Def = createSVGGroup(config.mainColor2, config.useStroke, config.strokeWidth);
+      const groupOffsetDef = createSVGGroup(config.offsetColor, config.useStroke, config.strokeWidth);
+
+      let circles1 = ""; let circles2 = ""; let circlesOffset = "";
+      let gridIndex = 0;
+
+      for (let y = 0; y < imageHeight; y += config.gridSpacing) {
+        for (let x = 0; x < imageWidth; x += config.gridSpacing) {
+          // Apply selected distortion
+          const mainDistorted = distortPoint(x, y, imageWidth, imageHeight); // Wrapper handles which type
+
+          const mainBrightness = getBrightness(imagePixelData, x, y, imageWidth);
+          const mainDiameter = mapRange(mainBrightness, 0, 255, config.maxCircleSize, config.minCircleSize);
+
+          if (gridIndex % 2 === 0) circles1 += createCircleSVG(mainDistorted.x, mainDistorted.y, mainDiameter / 2);
+          else circles2 += createCircleSVG(mainDistorted.x, mainDistorted.y, mainDiameter / 2);
+
+          // Offset Grid - Apply same distortion logic to offset base point
+          const offsetBaseX = x + config.offsetX;
+          const offsetBaseY = y + config.offsetY;
+          const offsetDistorted = distortPoint(offsetBaseX, offsetBaseY, imageWidth, imageHeight); // Use same wrapper
+
+          const offsetBrightness = getBrightness(imagePixelData, x, y, imageWidth); // Brightness from original pos
+          const offsetDiameter = mapRange(offsetBrightness, 0, 255, config.maxCircleSize, config.minCircleSize);
+          circlesOffset += createCircleSVG(offsetDistorted.x, offsetDistorted.y, offsetDiameter / 2);
+
+          gridIndex++;
+        }
+         if (Math.floor(imageWidth / config.gridSpacing) % 2 === 0) { gridIndex++; } // Checkerboard shift
+      }
+
+      const finalSVGs = {};
+      const header = createSVGHeader(imageWidth, imageHeight, outputWidthMM, outputHeightMM);
+      finalSVGs[config.mainColor1] = header + group1Def + circles1 + '</g></svg>';
+      finalSVGs[config.mainColor2] = header + group2Def + circles2 + '</g></svg>';
+      finalSVGs[config.offsetColor] = header + groupOffsetDef + circlesOffset + '</g></svg>';
+
+      const combinedSvgString = header + group1Def + circles1 + '</g>' + group2Def + circles2 + '</g>' + groupOffsetDef + circlesOffset + '</g>' + '</svg>';
+
+      console.log("SVG generation complete.");
+      return { individual: finalSVGs, combined: combinedSvgString };
+    }
+
+
+    function displayResults(results) { /* Remains the same as previous version */
+        svgPreview.innerHTML = ''; downloadLinks.innerHTML = '';
+        const { individual, combined } = results;
+        let layerIndex = 1;
+        Object.entries(individual).forEach(([color, svgString]) => {
+            if (!svgString) return;
+            const container = document.createElement('div');
+            container.className = 'svg-container';
+            const title = `Layer ${layerIndex++}: ${color}`;
+            container.innerHTML = `<h3>${title}</h3>` + svgString;
+            svgPreview.appendChild(container);
+            try {
+                 const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                 const url = URL.createObjectURL(blob);
+                 const link = document.createElement('a');
+                 link.href = url; link.download = `halftone-layer-${layerIndex-1}-${color}.svg`; link.textContent = `Download ${title}`;
+                 downloadLinks.appendChild(link);
+             } catch (error) { console.error("Error creating download link for", color, error); }
+        });
+         if (combined) {
+             const container = document.createElement('div');
+             container.className = 'svg-container';
+             container.innerHTML = `<h3>Combined Preview</h3>` + combined;
+             svgPreview.appendChild(container);
+             try {
+                 const blob = new Blob([combined], { type: 'image/svg+xml;charset=utf-8' });
+                 const url = URL.createObjectURL(blob);
+                 const link = document.createElement('a');
+                 link.href = url; link.download = `halftone-combined.svg`; link.textContent = `Download Combined SVG`;
+                 downloadLinks.appendChild(link);
+             } catch (error) { console.error("Error creating download link for combined SVG:", error); }
+         }
+    }
+
+    // --- Initial Setup ---
+    function initialize() {
+        // Populate config with initial default values from HTML inputs
+        config.outputWidthMM = parseFloat(outputWidthMMInput.value);
+        config.gridSpacing = parseFloat(gridSpacingInput.value);
+        config.maxCircleSize = parseFloat(maxCircleSizeInput.value);
+        config.minCircleSize = parseFloat(minCircleSizeInput.value);
+        config.offsetX = parseFloat(offsetXInput.value);
+        config.offsetY = parseFloat(offsetYInput.value);
+        config.useGradientDistortion = useGradientDistortionInput.checked;
+        config.distortionAmount = parseFloat(distortionAmountInput.value);
+        config.distortionScale = parseFloat(distortionScaleInput.value); // Wave scale
+        config.mainColor1 = mainColor1Input.value;
+        config.mainColor2 = mainColor2Input.value;
+        config.offsetColor = offsetColorInput.value;
+        config.useStroke = useStrokeInput.checked;
+        config.strokeWidth = parseFloat(strokeWidthInput.value);
+
+        // Set initial display values for sliders
+        updateRangeDisplay(gridSpacingInput, gridSpacingValue);
+        updateRangeDisplay(maxCircleSizeInput, maxCircleSizeValue);
+        updateRangeDisplay(minCircleSizeInput, minCircleSizeValue);
+        updateRangeDisplay(offsetXInput, offsetXValue);
+        updateRangeDisplay(offsetYInput, offsetYValue);
+        updateRangeDisplay(distortionAmountInput, distortionAmountValue);
+        updateRangeDisplay(distortionScaleInput, distortionScaleValue); // Wave scale
+
+        // Initial state for dependent controls
+        strokeWidthInput.disabled = !config.useStroke;
+        useGradientDistortionInput.disabled = true; // Disabled until image+gradient ready
+        distortionScaleInput.disabled = config.useGradientDistortion; // Disable wave if gradient checked
+
+        console.log("Generator initialized.");
+    }
+
+    initialize(); // Run setup on page load
+
+  </script>
+</body>
+</html>
