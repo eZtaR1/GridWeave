@@ -29,7 +29,7 @@ This tool is inspired by generative plotter art styles, such as those seen by ar
 
 ## How to Use
 
-1.  **Save:** Save the HTML code provided into a file named `halftone_generator.html` (or similar).
+1.  **Save:** Save the HTML code provided into a file named `gridweave.html` or whatever.
 2.  **Open:** Open this HTML file in a modern web browser (like Chrome, Firefox, Edge).
 3.  **Upload:** Click the "Choose File" button and select your desired source image (JPEG, PNG, GIF, etc.).
 4.  **Process:** Wait a few moments. The tool will display a preview, convert the image to grayscale, and (if gradient distortion is available) calculate the image's flow field. A status message will indicate when it's "Image ready."
