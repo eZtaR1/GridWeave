@@ -4,6 +4,7 @@ A browser-based tool to convert an input image into layered SVG files suitable f
 This tool is inspired by generative plotter art styles, such as those seen by artists like pavlovpulus, using multiple coloured pens and distorted grids based on underlying images.
 
 ## Features
+![Screenshot 2025-04-08 at 21-31-36 Flowing Halftone SVG Generator](https://github.com/user-attachments/assets/212263fe-500b-4721-a2e1-a745e7bc8d57)
 
 * **Image Upload:** Process your own images directly in the browser.
 * **Layered SVG Output:** Generates 3 separate SVG files, one for each color layer, ideal for multi-pen plotting.
