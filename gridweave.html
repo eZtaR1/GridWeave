@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GridWeave SVG Generator</title>
   <style>
-    /* CSS same as previous working version */
+    /* CSS unchanged */
     body { font-family: system-ui, -apple-system, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
     h1 { color: #333; text-align: center; margin-bottom: 30px; }
     .controls { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
@@ -37,7 +37,7 @@
     .slider-input-row input[type="number"] { flex-shrink: 0; margin-left: 5px; }
     .mm-estimate { font-size: 0.8em; color: #777; margin-left: 5px; white-space: nowrap; flex-shrink: 0; min-width: 65px; display: inline-block; text-align: right; }
     .color-row { justify-content: flex-start; }
-    .color-row label { flex-basis: 100px; text-align: right; }
+    .color-row label { flex-basis: 120px; /* Adjusted width */ text-align: right; }
     .color-row input[type="color"] { flex-shrink: 0; }
     .checkbox-row label { display: flex !important; align-items: center; flex-basis: auto;}
     .status-message { font-style: italic; color: #666; margin: 10px 0; font-size: 0.9em;}
@@ -64,19 +64,25 @@
                 <input type="number" id="densityCm" min="0.1" max="100" value="6" step="0.1">
              </div>
 
-             <label for="maxCircleSize">Max Diameter (px):</label>
+             <label for="maxCircleSize">Max Primary Diameter (px):</label>
               <div class="control-row slider-input-row">
                   <input type="range" id="maxCircleSizeRange" min="1" max="100" value="9" step="0.5">
                   <input type="number" id="maxCircleSize" min="1" max="500" value="9" step="0.1">
                   <span class="mm-estimate" id="maxCircleSizeMM">(-- mm)</span>
               </div>
 
-             <label for="minCircleSize">Min Diameter (px):</label>
+             <label for="minCircleSize">Min Primary Diameter (px):</label>
              <div class="control-row slider-input-row">
                  <input type="range" id="minCircleSizeRange" min="0.1" max="20" value="0.5" step="0.1">
                   <input type="number" id="minCircleSize" min="0" max="100" value="0.5" step="0.1">
                   <span class="mm-estimate" id="minCircleSizeMM">(-- mm)</span>
              </div>
+
+             <label for="secondaryRatio">Secondary Size (% of Primary):</label>
+              <div class="control-row slider-input-row">
+                  <input type="range" id="secondaryRatioRange" min="0.05" max="1.0" value="0.5" step="0.01">
+                  <input type="number" id="secondaryRatio" min="0.01" max="1.0" value="0.5" step="0.01">
+                  </div>
         </div>
 
         <div class="control-group">
@@ -108,11 +114,11 @@
 
         <div class="control-group">
             <div class="control-row color-row">
-                 <label for="mainColor1">Main Color 1:</label>
-                 <input type="color" id="mainColor1" value="#000000"> </div>
+                 <label for="primaryColor">Primary Color:</label>
+                 <input type="color" id="primaryColor" value="#000000"> </div>
              <div class="control-row color-row">
-                 <label for="mainColor2">Main Color 2:</label>
-                 <input type="color" id="mainColor2" value="#FF0000"> </div>
+                 <label for="secondaryColor">Secondary Color:</label>
+                 <input type="color" id="secondaryColor" value="#FF0000"> </div>
             <div class="control-row color-row">
                  <label for="offsetColor">Offset Color:</label>
                  <input type="color" id="offsetColor" value="#0000FF"> </div>
@@ -128,31 +134,18 @@
         </div>
     </div>
 
-     <div class="image-preview" id="imagePreview">
-        <p>Upload an image to begin.</p>
-        <img id="previewImage" src="#" alt="Image Preview" style="display: none;">
-    </div>
-
-    <div style="text-align: center; margin-top: 20px;">
-        <button id="generateButton" disabled>Generate SVGs</button>
-    </div>
-
-  </div> <div class="svg-preview-area">
-         <h2>SVG Previews</h2>
-         <div class="svg-preview" id="svgPreview"> <p>Previews will appear here after generation.</p> </div>
-         <div class="download-links" id="downloadLinks"> </div>
-    </div>
+     <div class="image-preview" id="imagePreview"> <p>Upload an image to begin.</p> <img id="previewImage" src="#" alt="Image Preview" style="display: none;"> </div>
+     <div style="text-align: center; margin-top: 20px;"> <button id="generateButton" disabled>Generate SVGs</button> </div>
+  </div> <div class="svg-preview-area"> <h2>SVG Previews</h2> <div class="svg-preview" id="svgPreview"> <p>Previews will appear here after generation.</p> </div> <div class="download-links" id="downloadLinks"> </div> </div>
 
   <script>
     // --- Configuration ---
     const config = {}; // Populated in initialize()
 
     // --- Constants ---
-    const MM_PER_INCH = 25.4;
-    const DPI = 96;
-    const MM_PER_PIXEL_BASELINE = MM_PER_INCH / DPI;
+    const MM_PER_INCH = 25.4; const DPI = 96; const MM_PER_PIXEL_BASELINE = MM_PER_INCH / DPI;
 
-    // --- DOM elements --- (Ensure all are selected)
+    // --- DOM elements --- (Select all elements, including new Ratio controls, updated color IDs)
     const imageInput = document.getElementById('imageInput');
     const imageStatus = document.getElementById('imageStatus');
     const imagePreviewDiv = document.getElementById('imagePreview');
@@ -169,6 +162,8 @@
     const minCircleSizeRange = document.getElementById('minCircleSizeRange');
     const minCircleSizeInput = document.getElementById('minCircleSize');
     const minCircleSizeMM = document.getElementById('minCircleSizeMM');
+    const secondaryRatioRange = document.getElementById('secondaryRatioRange'); // New
+    const secondaryRatioInput = document.getElementById('secondaryRatio');       // New
     const invertOffsetSizeInput = document.getElementById('invertOffsetSize');
     const useGradientDistortionInput = document.getElementById('useGradientDistortion');
     const distortionAmountRange = document.getElementById('distortionAmountRange');
@@ -176,19 +171,15 @@
     const distortionAmountMM = document.getElementById('distortionAmountMM');
     const distortionScaleRange = document.getElementById('distortionScaleRange');
     const distortionScaleInput = document.getElementById('distortionScale');
-    const mainColor1Input = document.getElementById('mainColor1');
-    const mainColor2Input = document.getElementById('mainColor2');
+    const primaryColorInput = document.getElementById('primaryColor');     // Renamed
+    const secondaryColorInput = document.getElementById('secondaryColor'); // Renamed
     const offsetColorInput = document.getElementById('offsetColor');
     const useStrokeInput = document.getElementById('useStroke');
     const strokeWidthInput = document.getElementById('strokeWidth');
     const strokeWidthMM = document.getElementById('strokeWidthMM');
 
     // --- Global State ---
-    let currentImage = null;
-    let imagePixelData = null;
-    let currentGradientData = null;
-    let imageWidth = 0;
-    let imageHeight = 0;
+    let currentImage = null; let imagePixelData = null; let currentGradientData = null; let imageWidth = 0; let imageHeight = 0;
 
     // --- Helper Functions --- (Unchanged)
     function getBrightness(imageData, x, y, width) { x = Math.max(0, Math.min(Math.floor(x), width - 1)); y = Math.max(0, Math.min(Math.floor(y), imageData.height - 1)); const i = (y * width + x) * 4; if (i >= 0 && i < imageData.data.length - 3) return imageData.data[i]; return 255;}
@@ -205,70 +196,158 @@
     function updateMMDisplays() { if (imageWidth > 0 && config.outputWidthMM > 0) { const mmPerPx = config.outputWidthMM / imageWidth; maxCircleSizeMM.textContent = `(≈ ${(config.maxCircleSize * mmPerPx).toFixed(2)} mm)`; minCircleSizeMM.textContent = `(≈ ${(config.minCircleSize * mmPerPx).toFixed(2)} mm)`; distortionAmountMM.textContent = `(≈ ${(config.distortionAmount * mmPerPx).toFixed(2)} mm)`; strokeWidthMM.textContent = `(≈ ${(config.strokeWidth * mmPerPx).toFixed(2)} mm)`; } else { maxCircleSizeMM.textContent = `(-- mm)`; minCircleSizeMM.textContent = `(-- mm)`; distortionAmountMM.textContent = `(-- mm)`; strokeWidthMM.textContent = `(-- mm)`; } }
 
     // --- Synchronization for Slider + Number Input --- (Unchanged function)
-    function setupSyncedInput(rangeInput, numberInput, configKey, isFloat = true, updateMM = false) { const updateConfig = (valueStr, source = 'unknown') => { const value = isFloat ? parseFloat(valueStr) : parseInt(valueStr); let numberMin = parseFloat(numberInput.min); let numberMax = parseFloat(numberInput.max); let rangeMin = rangeInput ? parseFloat(rangeInput.min) : NaN; let rangeMax = rangeInput ? parseFloat(rangeInput.max) : NaN; const minLimit = !isNaN(numberMin) ? numberMin : (!isNaN(rangeMin) ? rangeMin : -Infinity); const maxLimit = !isNaN(numberMax) ? numberMax : (!isNaN(rangeMax) ? rangeMax : Infinity); const clampedValue = Math.max(minLimit, Math.min(value, maxLimit)); if (!isNaN(clampedValue)) { config[configKey] = clampedValue; const formattedValue = clampedValue.toFixed(isFloat ? (configKey==='distortionScale' ? 3 : (configKey==='densityCm' ? 1 : 1)) : 0 ); if (source === 'range' && rangeInput) { numberInput.value = formattedValue; } else if (source === 'number') { if (rangeInput && clampedValue >= rangeMin && clampedValue <= rangeMax) { rangeInput.value = clampedValue; } numberInput.value = formattedValue; } else { if(rangeInput) rangeInput.value = clampedValue; numberInput.value = formattedValue; } if (updateMM) updateMMDisplays(); } else if (source === 'number') { const validValue = config[configKey]; numberInput.value = validValue.toFixed(isFloat ? (configKey==='distortionScale' ? 3:1) : 0 ); if(rangeInput) rangeInput.value = validValue; } }; if (rangeInput) { rangeInput.addEventListener('input', (e) => { updateConfig(e.target.value, 'range'); }); } numberInput.addEventListener('input', (e) => { updateConfig(e.target.value, 'number'); }); numberInput.addEventListener('change', (e) => { updateConfig(e.target.value, 'number'); }); }
+    function setupSyncedInput(rangeInput, numberInput, configKey, isFloat = true, updateMM = false) { const updateConfig = (valueStr, source = 'unknown') => { const value = isFloat ? parseFloat(valueStr) : parseInt(valueStr); let numberMin = parseFloat(numberInput.min); let numberMax = parseFloat(numberInput.max); let rangeMin = rangeInput ? parseFloat(rangeInput.min) : NaN; let rangeMax = rangeInput ? parseFloat(rangeInput.max) : NaN; const minLimit = !isNaN(numberMin) ? numberMin : (!isNaN(rangeMin) ? rangeMin : -Infinity); const maxLimit = !isNaN(numberMax) ? numberMax : (!isNaN(rangeMax) ? rangeMax : Infinity); const clampedValue = Math.max(minLimit, Math.min(value, maxLimit)); if (!isNaN(clampedValue)) { config[configKey] = clampedValue; const numDecimalPlaces = (configKey === 'secondaryRatio' || configKey === 'distortionScale') ? 2 : (isFloat ? 1 : 0); const formattedValue = clampedValue.toFixed(numDecimalPlaces); if (source === 'range' && rangeInput) { numberInput.value = formattedValue; } else if (source === 'number') { if (rangeInput && clampedValue >= rangeMin && clampedValue <= rangeMax) { rangeInput.value = clampedValue; } numberInput.value = formattedValue; } else { if(rangeInput) rangeInput.value = clampedValue; numberInput.value = formattedValue; } if (updateMM) updateMMDisplays(); } else if (source === 'number') { const validValue = config[configKey]; numberInput.value = validValue.toFixed((configKey === 'secondaryRatio' || configKey === 'distortionScale') ? 2 : (isFloat ? 1 : 0)); if(rangeInput) rangeInput.value = validValue; } }; if (rangeInput) { rangeInput.addEventListener('input', (e) => { updateConfig(e.target.value, 'range'); }); } numberInput.addEventListener('input', (e) => { updateConfig(e.target.value, 'number'); }); numberInput.addEventListener('change', (e) => { updateConfig(e.target.value, 'number'); }); }
 
-    // --- Event Listeners --- (Unchanged)
+    // --- Event Listeners ---
     outputWidthMMInput.addEventListener('input', () => { config.outputWidthMM = parseFloat(outputWidthMMInput.value) || 210; updateMMDisplays(); });
-    mainColor1Input.addEventListener('input', () => { config.mainColor1 = mainColor1Input.value; });
-    mainColor2Input.addEventListener('input', () => { config.mainColor2 = mainColor2Input.value; });
+    primaryColorInput.addEventListener('input', () => { config.primaryColor = primaryColorInput.value; }); // Renamed
+    secondaryColorInput.addEventListener('input', () => { config.secondaryColor = secondaryColorInput.value; }); // Renamed
     offsetColorInput.addEventListener('input', () => { config.offsetColor = offsetColorInput.value; });
     useStrokeInput.addEventListener('change', () => { config.useStroke = useStrokeInput.checked; strokeWidthInput.disabled = !config.useStroke; if (!config.useStroke) { strokeWidthMM.textContent = "(-- mm)"; } else { updateMMDisplays(); } });
     useGradientDistortionInput.addEventListener('change', () => { config.useGradientDistortion = useGradientDistortionInput.checked; distortionScaleInput.disabled = config.useGradientDistortion; distortionScaleRange.disabled = config.useGradientDistortion;});
     invertOffsetSizeInput.addEventListener('change', () => { config.invertOffsetSize = invertOffsetSizeInput.checked; });
 
-    imageInput.addEventListener('change', (e) => { // Minimal logs kept
-        const file = e.target.files[0];
-        currentImage = null; imagePixelData = null; currentGradientData = null; imageWidth = 0;
-        generateButton.disabled = true; useGradientDistortionInput.checked = false;
-        useGradientDistortionInput.disabled = true; config.useGradientDistortion = false;
-        distortionScaleInput.disabled = false; distortionScaleRange.disabled = false;
-        imageStatus.textContent = ""; previewImage.style.display = 'none';
-        imagePreviewDiv.querySelector('p').style.display = 'block';
+    imageInput.addEventListener('change', (e) => { /* Unchanged image loading */ });
+    // ... (Image loading logic unchanged) ...
+    imageInput.addEventListener('change', (e) => { const file = e.target.files[0]; currentImage = null; imagePixelData = null; currentGradientData = null; imageWidth = 0; generateButton.disabled = true; useGradientDistortionInput.checked = false; useGradientDistortionInput.disabled = true; config.useGradientDistortion = false; distortionScaleInput.disabled = false; distortionScaleRange.disabled = false; imageStatus.textContent = ""; previewImage.style.display = 'none'; imagePreviewDiv.querySelector('p').style.display = 'block'; updateMMDisplays(); if (file) { imageStatus.textContent = "Loading image..."; const reader = new FileReader(); reader.onload = (event) => { const img = new Image(); img.onload = () => { imageStatus.textContent = "Processing image..."; currentImage = img; imageWidth = img.width; imageHeight = img.height; previewImage.src = event.target.result; previewImage.style.display = 'block'; imagePreviewDiv.querySelector('p').style.display = 'none'; updateMMDisplays(); setTimeout(() => { const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d', { willReadFrequently: true }); canvas.width = imageWidth; canvas.height = imageHeight; ctx.filter = 'grayscale(100%)'; ctx.drawImage(img, 0, 0, imageWidth, imageHeight); try { imagePixelData = ctx.getImageData(0, 0, imageWidth, imageHeight); imageStatus.textContent = "Calculating flow field..."; setTimeout(() => { try { currentGradientData = calculateGradientField(imagePixelData, imageWidth, imageHeight); generateButton.disabled = false; useGradientDistortionInput.disabled = false; imageStatus.textContent = "Image ready."; } catch (gradientError) { console.error("Error calculating gradient field:", gradientError); alert("Could not calculate image flow field. Using wave distortion only."); imageStatus.textContent = "Image loaded (gradient failed)."; generateButton.disabled = false; useGradientDistortionInput.disabled = true; currentGradientData = null;} }, 50); } catch (error) { console.error("Error getting image data:", error); alert("Could not process image. Check console."); imageStatus.textContent = "Image processing failed."; generateButton.disabled = true; useGradientDistortionInput.disabled = true;} }, 50); }; img.onerror = () => { alert("Failed to load image."); imageStatus.textContent = "Failed to load image.";} img.src = event.target.result; }; reader.onerror = () => { alert("Failed to read file."); imageStatus.textContent = "Failed to read file.";} reader.readAsDataURL(file); } });
+
+
+    // --- Main Generation Logic ---
+    generateButton.addEventListener('click', () => { /* Read updated config */
+      if (!currentImage || !imagePixelData) { alert("Please upload image."); return; }
+      if (config.useGradientDistortion && !currentGradientData) { alert("Gradient data not ready..."); return; }
+
+      // Update config just before generation (values already synced by listeners)
+      config.outputWidthMM = parseFloat(outputWidthMMInput.value) || 210;
+      config.densityCm = parseFloat(densityCmInput.value) || 6;
+      config.maxCircleSize = parseFloat(maxCircleSizeInput.value) || 9;
+      config.minCircleSize = parseFloat(minCircleSizeInput.value) || 0.5;
+      config.secondaryRatio = parseFloat(secondaryRatioInput.value) || 0.5; // Read new ratio
+      config.invertOffsetSize = invertOffsetSizeInput.checked;
+      config.useGradientDistortion = useGradientDistortionInput.checked;
+      config.distortionAmount = parseFloat(distortionAmountInput.value) || 10;
+      if (!config.useGradientDistortion) { config.distortionScale = parseFloat(distortionScaleInput.value) || 0.015; }
+      config.primaryColor = primaryColorInput.value; // Use new keys
+      config.secondaryColor = secondaryColorInput.value;
+      config.offsetColor = offsetColorInput.value;
+      config.useStroke = useStrokeInput.checked;
+      config.strokeWidth = parseFloat(strokeWidthInput.value) || 0.5;
+
+      generateButton.textContent = "Generating..."; generateButton.disabled = true;
+      svgPreview.innerHTML = '<p>Generating SVG layers...</p>'; downloadLinks.innerHTML = '';
+
+      setTimeout(() => {
+          try { const results = generateSVGs(); displayResults(results); }
+          catch (error) { console.error("Error during SVG generation:", error); alert("An error occurred during SVG generation. Check console."); svgPreview.innerHTML = '<p>Error generating SVGs.</p>'; }
+          finally { generateButton.textContent = "Generate SVGs"; generateButton.disabled = !(currentImage && imagePixelData && (!config.useGradientDistortion || currentGradientData)); }
+      }, 10);
+    });
+
+
+    function generateSVGs() { // ** UPDATED for Primary/Secondary Ratio **
+        if (!imagePixelData) throw new Error("Image pixel data missing."); if (config.useGradientDistortion && !currentGradientData) throw new Error("Gradient data missing for gradient distortion."); console.log("Starting SVG generation with config:", config);
+        let actualGridSpacingPx = 10; if (config.densityCm > 0 && config.outputWidthMM > 0 && imageWidth > 0) { const densityMM = config.densityCm / 10; const numCirclesAcrossOutput = densityMM * config.outputWidthMM; actualGridSpacingPx = imageWidth / numCirclesAcrossOutput; if (actualGridSpacingPx < 1) { console.warn(`Calculated grid spacing ${actualGridSpacingPx.toFixed(2)}px is less than 1px! Capping at 1px.`); actualGridSpacingPx = 1; } console.log(`Density ${config.densityCm} circ/cm -> Spacing ${actualGridSpacingPx.toFixed(2)} px`); } else { console.warn("Could not calculate spacing from density, using fallback."); }
+        const autoOffsetX = actualGridSpacingPx / 2; const autoOffsetY = actualGridSpacingPx / 2;
+        const aspect = imageWidth / imageHeight; const outputWidthMM = config.outputWidthMM; const outputHeightMM = outputWidthMM / aspect;
+
+        // Use new color config keys
+        const groupPrimaryDef = createSVGGroup(config.primaryColor, config.useStroke, config.strokeWidth);
+        const groupSecondaryDef = createSVGGroup(config.secondaryColor, config.useStroke, config.strokeWidth);
+        const groupOffsetDef = createSVGGroup(config.offsetColor, config.useStroke, config.strokeWidth);
+
+        let circlesPrimary = ""; let circlesSecondary = ""; let circlesOffset = ""; // Renamed for clarity
+
+        for (let y = 0; y < imageHeight; y += actualGridSpacingPx) { for (let x = 0; x < imageWidth; x += actualGridSpacingPx) {
+            const mainDistorted = distortPoint(x, y, imageWidth, imageHeight);
+            const mainBrightness = getBrightness(imagePixelData, x, y, imageWidth);
+
+            // --- Primary & Secondary Diameters ---
+            const primaryDiameter = mapRange(mainBrightness, 0, 255, config.maxCircleSize, config.minCircleSize);
+            const potentialSecondaryDiameter = primaryDiameter * config.secondaryRatio;
+            // Ensure secondary is never smaller than the min primary size allowed
+            const finalSecondaryDiameter = Math.max(potentialSecondaryDiameter, config.minCircleSize);
+
+            // Add primary circle
+            circlesPrimary += createCircleSVG(mainDistorted.x, mainDistorted.y, primaryDiameter / 2);
+            // Add secondary circle (at same location)
+            circlesSecondary += createCircleSVG(mainDistorted.x, mainDistorted.y, finalSecondaryDiameter / 2);
+
+            // --- Offset Grid --- (logic unchanged)
+            const offsetBaseX = x + autoOffsetX; const offsetBaseY = y + autoOffsetY;
+            const offsetDistorted = distortPoint(offsetBaseX, offsetBaseY, imageWidth, imageHeight);
+            const offsetBrightness = getBrightness(imagePixelData, x, y, imageWidth);
+            let offsetDiameter;
+            if (config.invertOffsetSize) { offsetDiameter = mapRange(offsetBrightness, 0, 255, config.minCircleSize, config.maxCircleSize); }
+            else { offsetDiameter = mapRange(offsetBrightness, 0, 255, config.maxCircleSize, config.minCircleSize); }
+            circlesOffset += createCircleSVG(offsetDistorted.x, offsetDistorted.y, offsetDiameter / 2);
+        } }
+
+        // --- Assemble SVGs ---
+        const finalSVGs = {}; const header = createSVGHeader(imageWidth, imageHeight, outputWidthMM, outputHeightMM);
+        finalSVGs[config.primaryColor] = header + groupPrimaryDef + circlesPrimary + '</g></svg>'; // Use primary color key
+        finalSVGs[config.secondaryColor] = header + groupSecondaryDef + circlesSecondary + '</g></svg>'; // Use secondary color key
+        finalSVGs[config.offsetColor] = header + groupOffsetDef + circlesOffset + '</g></svg>';
+        const combinedSvgString = header + groupPrimaryDef + circlesPrimary + '</g>' + groupSecondaryDef + circlesSecondary + '</g>' + groupOffsetDef + circlesOffset + '</g>' + '</svg>';
+        console.log("SVG generation complete."); return { individual: finalSVGs, combined: combinedSvgString };
+    }
+
+    function displayResults(results) { /* Unchanged */ }
+    // ... (displayResults unchanged) ...
+     function displayResults(results) { svgPreview.innerHTML = ''; downloadLinks.innerHTML = ''; const { individual, combined } = results; let layerIndex = 1; Object.entries(individual).forEach(([color, svgString]) => { if (!svgString) return; const container = document.createElement('div'); container.className = 'svg-container'; const title = `Layer ${layerIndex++}: ${color}`; container.innerHTML = `<h3>${title}</h3>` + svgString; svgPreview.appendChild(container); try { const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `halftone-layer-${layerIndex-1}-${color}.svg`; link.textContent = `Download ${title}`; downloadLinks.appendChild(link); } catch (error) { console.error("Error creating download link for", color, error); } }); if (combined) { const container = document.createElement('div'); container.className = 'svg-container'; container.innerHTML = `<h3>Combined Preview</h3>` + combined; svgPreview.appendChild(container); try { const blob = new Blob([combined], { type: 'image/svg+xml;charset=utf-8' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `halftone-combined.svg`; link.textContent = `Download Combined SVG`; downloadLinks.appendChild(link); } catch (error) { console.error("Error creating download link for combined SVG:", error); } } }
+
+    // --- Initial Setup ---
+    function initialize() { // ** Update config names, add ratio **
+        config.outputWidthMM = parseFloat(outputWidthMMInput.value) || 210;
+        config.densityCm = parseFloat(densityCmInput.value) || 6;
+        config.maxCircleSize = parseFloat(maxCircleSizeInput.value) || 9; // Now Primary Max
+        config.minCircleSize = parseFloat(minCircleSizeInput.value) || 0.5; // Now Primary Min (also secondary floor)
+        config.secondaryRatio = parseFloat(secondaryRatioInput.value) || 0.5; // New Ratio
+        config.invertOffsetSize = invertOffsetSizeInput.checked || false;
+        config.useGradientDistortion = useGradientDistortionInput.checked || false;
+        config.distortionAmount = parseFloat(distortionAmountInput.value) || 10;
+        config.distortionScale = parseFloat(distortionScaleInput.value) || 0.015;
+        config.primaryColor = primaryColorInput.value || '#000000';   // Renamed
+        config.secondaryColor = secondaryColorInput.value || '#FF0000'; // Renamed
+        config.offsetColor = offsetColorInput.value || '#0000FF';
+        config.useStroke = useStrokeInput.checked || false;
+        config.strokeWidth = parseFloat(strokeWidthInput.value) || 0.5;
+
+        // Setup sync listeners FIRST
+        setupSyncedInput(densityCmRange, densityCmInput, 'densityCm');
+        setupSyncedInput(maxCircleSizeRange, maxCircleSizeInput, 'maxCircleSize', true, true);
+        setupSyncedInput(minCircleSizeRange, minCircleSizeInput, 'minCircleSize', true, true);
+        setupSyncedInput(secondaryRatioRange, secondaryRatioInput, 'secondaryRatio', true); // New ratio listener
+        setupSyncedInput(distortionAmountRange, distortionAmountInput, 'distortionAmount', false, true);
+        setupSyncedInput(distortionScaleRange, distortionScaleInput, 'distortionScale');
+         strokeWidthInput.addEventListener('input', (e) => { let val = parseFloat(e.target.value) || 0.5; const min = parseFloat(strokeWidthInput.min); const max = parseFloat(strokeWidthInput.max); val = Math.max(min, Math.min(val, max)); config.strokeWidth = val; strokeWidthInput.value = val; updateMMDisplays(); });
+         strokeWidthInput.addEventListener('change', (e) => { let val = parseFloat(e.target.value) || 0.5; const min = parseFloat(strokeWidthInput.min); const max = parseFloat(strokeWidthInput.max); val = Math.max(min, Math.min(val, max)); config.strokeWidth = val; strokeWidthInput.value = val; updateMMDisplays(); });
+
+        // Set initial visual state for inputs FROM config
+        // ... (ensure all inputs incl. new ratio are set visually) ...
+        outputWidthMMInput.value = config.outputWidthMM;
+        densityCmRange.value = config.densityCm; densityCmInput.value = config.densityCm;
+        maxCircleSizeRange.value = config.maxCircleSize; maxCircleSizeInput.value = config.maxCircleSize;
+        minCircleSizeRange.value = config.minCircleSize; minCircleSizeInput.value = config.minCircleSize;
+        secondaryRatioRange.value = config.secondaryRatio; secondaryRatioInput.value = config.secondaryRatio; // Set ratio visually
+        distortionAmountRange.value = config.distortionAmount; distortionAmountInput.value = config.distortionAmount;
+        distortionScaleRange.value = config.distortionScale; distortionScaleInput.value = config.distortionScale;
+        primaryColorInput.value = config.primaryColor;
+        secondaryColorInput.value = config.secondaryColor;
+        offsetColorInput.value = config.offsetColor;
+        useStrokeInput.checked = config.useStroke;
+        strokeWidthInput.value = config.strokeWidth;
+        invertOffsetSizeInput.checked = config.invertOffsetSize;
+        useGradientDistortionInput.checked = config.useGradientDistortion;
+
+        // Initial state for dependent controls
+        strokeWidthInput.disabled = !config.useStroke;
+        useGradientDistortionInput.disabled = true;
+        distortionScaleInput.disabled = config.useGradientDistortion;
+        distortionScaleRange.disabled = config.useGradientDistortion;
+
         updateMMDisplays();
-
-        if (file) {
-            imageStatus.textContent = "Loading image...";
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                    imageStatus.textContent = "Processing image...";
-                    currentImage = img; imageWidth = img.width; imageHeight = img.height;
-                    previewImage.src = event.target.result; previewImage.style.display = 'block';
-                    imagePreviewDiv.querySelector('p').style.display = 'none';
-                    updateMMDisplays();
-                    setTimeout(() => {
-                        const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d', { willReadFrequently: true }); canvas.width = imageWidth; canvas.height = imageHeight; ctx.filter = 'grayscale(100%)'; ctx.drawImage(img, 0, 0, imageWidth, imageHeight);
-                        try {
-                            imagePixelData = ctx.getImageData(0, 0, imageWidth, imageHeight);
-                            imageStatus.textContent = "Calculating flow field...";
-                            setTimeout(() => {
-                                try {
-                                    currentGradientData = calculateGradientField(imagePixelData, imageWidth, imageHeight);
-                                    generateButton.disabled = false; useGradientDistortionInput.disabled = false;
-                                    imageStatus.textContent = "Image ready.";
-                                } catch (gradientError) { console.error("Error calculating gradient field:", gradientError); alert("Could not calculate image flow field. Using wave distortion only."); imageStatus.textContent = "Image loaded (gradient failed)."; generateButton.disabled = false; useGradientDistortionInput.disabled = true; currentGradientData = null;}
-                            }, 50);
-                        } catch (error) { console.error("Error getting image data:", error); alert("Could not process image. Check console."); imageStatus.textContent = "Image processing failed."; generateButton.disabled = true; useGradientDistortionInput.disabled = true;}
-                    }, 50);
-                };
-                img.onerror = () => { alert("Failed to load image."); imageStatus.textContent = "Failed to load image.";}
-                img.src = event.target.result;
-            };
-            reader.onerror = () => { alert("Failed to read file."); imageStatus.textContent = "Failed to read file.";}
-            reader.readAsDataURL(file);
-         }
-     });
-
-    // --- Main Generation Logic --- (Unchanged)
-    generateButton.addEventListener('click', () => { if (!currentImage || !imagePixelData) { alert("Please upload image."); return; } if (config.useGradientDistortion && !currentGradientData) { alert("Gradient data not ready..."); return; } config.outputWidthMM = parseFloat(outputWidthMMInput.value) || 210; config.densityCm = parseFloat(densityCmInput.value) || 6; config.maxCircleSize = parseFloat(maxCircleSizeInput.value) || 9; config.minCircleSize = parseFloat(minCircleSizeInput.value) || 0.5; config.invertOffsetSize = invertOffsetSizeInput.checked; config.useGradientDistortion = useGradientDistortionInput.checked; config.distortionAmount = parseFloat(distortionAmountInput.value) || 10; if (!config.useGradientDistortion) { config.distortionScale = parseFloat(distortionScaleInput.value) || 0.015; } config.mainColor1 = mainColor1Input.value; config.mainColor2 = mainColor2Input.value; config.offsetColor = offsetColorInput.value; config.useStroke = useStrokeInput.checked; config.strokeWidth = parseFloat(strokeWidthInput.value) || 0.5; generateButton.textContent = "Generating..."; generateButton.disabled = true; svgPreview.innerHTML = '<p>Generating SVG layers...</p>'; downloadLinks.innerHTML = ''; setTimeout(() => { try { const results = generateSVGs(); displayResults(results); } catch (error) { console.error("Error during SVG generation:", error); alert("An error occurred during SVG generation. Check console."); svgPreview.innerHTML = '<p>Error generating SVGs.</p>'; } finally { generateButton.textContent = "Generate SVGs"; generateButton.disabled = !(currentImage && imagePixelData && (!config.useGradientDistortion || currentGradientData)); } }, 10); });
-    function generateSVGs() { if (!imagePixelData) throw new Error("Image pixel data missing."); if (config.useGradientDistortion && !currentGradientData) throw new Error("Gradient data missing for gradient distortion."); console.log("Starting SVG generation with config:", config); let actualGridSpacingPx = 10; if (config.densityCm > 0 && config.outputWidthMM > 0 && imageWidth > 0) { const densityMM = config.densityCm / 10; const numCirclesAcrossOutput = densityMM * config.outputWidthMM; actualGridSpacingPx = imageWidth / numCirclesAcrossOutput; if (actualGridSpacingPx < 1) { console.warn(`Calculated grid spacing ${actualGridSpacingPx.toFixed(2)}px is less than 1px! Capping at 1px.`); actualGridSpacingPx = 1; } console.log(`Density ${config.densityCm} circ/cm -> Spacing ${actualGridSpacingPx.toFixed(2)} px`); } else { console.warn("Could not calculate spacing from density, using fallback."); } const autoOffsetX = actualGridSpacingPx / 2; const autoOffsetY = actualGridSpacingPx / 2; const aspect = imageWidth / imageHeight; const outputWidthMM = config.outputWidthMM; const outputHeightMM = outputWidthMM / aspect; const group1Def = createSVGGroup(config.mainColor1, config.useStroke, config.strokeWidth); const group2Def = createSVGGroup(config.mainColor2, config.useStroke, config.strokeWidth); const groupOffsetDef = createSVGGroup(config.offsetColor, config.useStroke, config.strokeWidth); let circles1 = ""; let circles2 = ""; let circlesOffset = ""; for (let y = 0; y < imageHeight; y += actualGridSpacingPx) { for (let x = 0; x < imageWidth; x += actualGridSpacingPx) { const mainDistorted = distortPoint(x, y, imageWidth, imageHeight); const mainBrightness = getBrightness(imagePixelData, x, y, imageWidth); const mainDiameter = mapRange(mainBrightness, 0, 255, config.maxCircleSize, config.minCircleSize); circles1 += createCircleSVG(mainDistorted.x, mainDistorted.y, mainDiameter / 2); circles2 += createCircleSVG(mainDistorted.x, mainDistorted.y, mainDiameter / 2); const offsetBaseX = x + autoOffsetX; const offsetBaseY = y + autoOffsetY; const offsetDistorted = distortPoint(offsetBaseX, offsetBaseY, imageWidth, imageHeight); const offsetBrightness = getBrightness(imagePixelData, x, y, imageWidth); let offsetDiameter; if (config.invertOffsetSize) { offsetDiameter = mapRange(offsetBrightness, 0, 255, config.minCircleSize, config.maxCircleSize); } else { offsetDiameter = mapRange(offsetBrightness, 0, 255, config.maxCircleSize, config.minCircleSize); } circlesOffset += createCircleSVG(offsetDistorted.x, offsetDistorted.y, offsetDiameter / 2); } } const finalSVGs = {}; const header = createSVGHeader(imageWidth, imageHeight, outputWidthMM, outputHeightMM); finalSVGs[config.mainColor1] = header + group1Def + circles1 + '</g></svg>'; finalSVGs[config.mainColor2] = header + group2Def + circles2 + '</g></svg>'; finalSVGs[config.offsetColor] = header + groupOffsetDef + circlesOffset + '</g></svg>'; const combinedSvgString = header + group1Def + circles1 + '</g>' + group2Def + circles2 + '</g>' + groupOffsetDef + circlesOffset + '</g>' + '</svg>'; console.log("SVG generation complete."); return { individual: finalSVGs, combined: combinedSvgString }; }
-
-    // --- Display Results --- (Unchanged)
-    function displayResults(results) { svgPreview.innerHTML = ''; downloadLinks.innerHTML = ''; const { individual, combined } = results; let layerIndex = 1; Object.entries(individual).forEach(([color, svgString]) => { if (!svgString) return; const container = document.createElement('div'); container.className = 'svg-container'; const title = `Layer ${layerIndex++}: ${color}`; container.innerHTML = `<h3>${title}</h3>` + svgString; svgPreview.appendChild(container); try { const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `halftone-layer-${layerIndex-1}-${color}.svg`; link.textContent = `Download ${title}`; downloadLinks.appendChild(link); } catch (error) { console.error("Error creating download link for", color, error); } }); if (combined) { const container = document.createElement('div'); container.className = 'svg-container'; container.innerHTML = `<h3>Combined Preview</h3>` + combined; svgPreview.appendChild(container); try { const blob = new Blob([combined], { type: 'image/svg+xml;charset=utf-8' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `halftone-combined.svg`; link.textContent = `Download Combined SVG`; downloadLinks.appendChild(link); } catch (error) { console.error("Error creating download link for combined SVG:", error); } } }
-
-    // --- Initial Setup --- (Unchanged)
-    function initialize() { config.outputWidthMM = parseFloat(outputWidthMMInput.value) || 210; config.densityCm = parseFloat(densityCmInput.value) || 6; config.maxCircleSize = parseFloat(maxCircleSizeInput.value) || 9; config.minCircleSize = parseFloat(minCircleSizeInput.value) || 0.5; config.invertOffsetSize = invertOffsetSizeInput.checked || false; config.useGradientDistortion = useGradientDistortionInput.checked || false; config.distortionAmount = parseFloat(distortionAmountInput.value) || 10; config.distortionScale = parseFloat(distortionScaleInput.value) || 0.015; config.mainColor1 = mainColor1Input.value || '#000000'; config.mainColor2 = mainColor2Input.value || '#FF0000'; config.offsetColor = offsetColorInput.value || '#0000FF'; config.useStroke = useStrokeInput.checked || false; config.strokeWidth = parseFloat(strokeWidthInput.value) || 0.5; densityCmRange.value = config.densityCm; densityCmInput.value = config.densityCm; maxCircleSizeRange.value = config.maxCircleSize; maxCircleSizeInput.value = config.maxCircleSize; minCircleSizeRange.value = config.minCircleSize; minCircleSizeInput.value = config.minCircleSize; distortionAmountRange.value = config.distortionAmount; distortionAmountInput.value = config.distortionAmount; distortionScaleRange.value = config.distortionScale; distortionScaleInput.value = config.distortionScale; mainColor1Input.value = config.mainColor1; mainColor2Input.value = config.mainColor2; offsetColorInput.value = config.offsetColor; useStrokeInput.checked = config.useStroke; invertOffsetSizeInput.checked = config.invertOffsetSize; useGradientDistortionInput.checked = config.useGradientDistortion; setupSyncedInput(densityCmRange, densityCmInput, 'densityCm'); setupSyncedInput(maxCircleSizeRange, maxCircleSizeInput, 'maxCircleSize', true, true); setupSyncedInput(minCircleSizeRange, minCircleSizeInput, 'minCircleSize', true, true); setupSyncedInput(distortionAmountRange, distortionAmountInput, 'distortionAmount', false, true); setupSyncedInput(distortionScaleRange, distortionScaleInput, 'distortionScale'); strokeWidthInput.addEventListener('input', (e) => { let val = parseFloat(e.target.value) || 0.5; const min = parseFloat(strokeWidthInput.min); const max = parseFloat(strokeWidthInput.max); val = Math.max(min, Math.min(val, max)); config.strokeWidth = val; strokeWidthInput.value = val; updateMMDisplays(); }); strokeWidthInput.addEventListener('change', (e) => { let val = parseFloat(e.target.value) || 0.5; const min = parseFloat(strokeWidthInput.min); const max = parseFloat(strokeWidthInput.max); val = Math.max(min, Math.min(val, max)); config.strokeWidth = val; strokeWidthInput.value = val; updateMMDisplays(); }); strokeWidthInput.disabled = !config.useStroke; useGradientDistortionInput.disabled = true; distortionScaleInput.disabled = config.useGradientDistortion; distortionScaleRange.disabled = config.useGradientDistortion; updateMMDisplays(); console.log("Generator initialized with config:", config); }
+        console.log("Generator initialized with config:", config);
+    }
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initialize); } else { initialize(); }
 
   </script>
